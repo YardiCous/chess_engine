@@ -1,3 +1,5 @@
+use crate::board::{Board, PlayerTurn};
+
 macro_rules! valid_chars {
     ($name:ident,$chars:literal) => {
         fn $name(c: &char) -> bool {
@@ -8,13 +10,17 @@ macro_rules! valid_chars {
 valid_chars!(valid_files, "abcdefgh");
 valid_chars!(valid_rank, "12345678");
 valid_chars!(valid_piece, "NKQBR");
-pub fn valid_input_moves(input: &str) -> bool {
+pub fn valid_input_moves(board: &Board, turn: &PlayerTurn, input: &str) -> bool {
     let chars: Vec<char> = input.chars().collect();
     match chars.as_slice() {
         /*
          * For pawn moves
          * */
-        [file, rank] if valid_files(file) && valid_rank(rank) => true,
+        [file, rank] if valid_files(file) && valid_rank(rank) => {
+            let square = board.pawn_move_valid_move(file, rank, turn);
+            println!("{:?}", square);
+            true
+        }
 
         /*
          * For Castling
