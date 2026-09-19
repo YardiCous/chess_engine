@@ -1,15 +1,13 @@
 #![allow(dead_code)]
-use crate::board::Board;
-use crate::board::PlayerTurn;
+use crate::{board::Board, player_turn::PlayerTurn};
 use std::io::Write;
 
 mod board;
 mod input_move;
-
+mod player_turn;
 fn main() {
     let mut chess_board = Board::new();
-
-    let mut player_turn = PlayerTurn::Black;
+    let mut player_turn = PlayerTurn::White;
     loop {
         let mut input_move = String::new();
 
@@ -17,7 +15,7 @@ fn main() {
         std::io::stdout().flush().unwrap();
         std::io::stdin()
             .read_line(&mut input_move)
-            .expect("Failed to read lien");
+            .expect("Failed to read line");
         let input_move_trimmed = input_move.trim();
         if check_input_valid(input_move_trimmed)
             && input_move::valid_input_moves(&chess_board, &player_turn, input_move_trimmed)
@@ -29,8 +27,5 @@ fn main() {
 }
 
 fn check_input_valid(input: &str) -> bool {
-    if input.len() == 1 || input.len() >= 7 {
-        return false;
-    }
-    true
+    input.len() > 1 && input.len() < 7
 }

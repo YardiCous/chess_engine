@@ -1,4 +1,5 @@
-use crate::board::{Board, PlayerTurn};
+use crate::PlayerTurn;
+use crate::board::Board;
 
 macro_rules! valid_chars {
     ($name:ident,$chars:literal) => {
@@ -17,7 +18,7 @@ pub fn valid_input_moves(board: &Board, turn: &PlayerTurn, input: &str) -> bool 
          * For pawn moves
          * */
         [file, rank] if valid_files(file) && valid_rank(rank) => {
-            let square = board.pawn_move_valid_move(file, rank, turn);
+            let square = board.pawn_valid_move(file, rank, turn);
             println!("{:?}", square);
             true
         }
