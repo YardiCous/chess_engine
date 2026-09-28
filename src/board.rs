@@ -1,25 +1,33 @@
 use crate::PlayerTurn;
-struct Move {
-    from: Square,
-    to: Square,
-    promotion: Option<Piece>,
+
+#[derive(Debug)]
+pub(crate) struct Move {
+    pub from: Square,
+    pub to: Square,
+    pub promotion: Option<Piece>,
 }
-enum Piece {
+#[derive(Debug)]
+pub(crate) enum Piece {
     Bishop,
     Knight,
     Queen,
     Rook,
+    Pawn,
+    King,
 }
 #[derive(Debug)]
-pub struct Square {
-    file: char,
-    rank: u8,
+pub(crate) struct Square {
+    bit: u8,
 }
 #[derive(Debug)]
-pub enum BoardError {
+pub(crate) enum BoardError {
     NoPiece,
     InputError,
     SquareOccupied,
+}
+pub(crate) enum Moves {
+    Capture(PlayerTurn),
+    Move,
 }
 
 #[rustfmt::skip]
@@ -89,51 +97,103 @@ impl Board {
 
         }
     }
+    pub fn move_piece(&mut self, piece: Piece, turn: &PlayerTurn, from: Square, to: Square) {
+        let from_bits = 1u64 << (from.bit);
+        let to_bits = 1u64 << (to.bit);
+
+        let board = match (turn, piece) {
+            (PlayerTurn::White, Piece::Pawn) => &mut self.white_pawns,
+            (PlayerTurn::White, Piece::Knight) => &mut self.white_knights,
+            (PlayerTurn::White, Piece::Bishop) => &mut self.white_bishops,
+            (PlayerTurn::White, Piece::Rook) => &mut self.white_rooks,
+            (PlayerTurn::White, Piece::Queen) => &mut self.white_queens,
+            (PlayerTurn::White, Piece::King) => &mut self.white_king,
+
+            (PlayerTurn::Black, Piece::Pawn) => &mut self.black_pawns,
+            (PlayerTurn::Black, Piece::Knight) => &mut self.black_knights,
+            (PlayerTurn::Black, Piece::Bishop) => &mut self.black_bishops,
+            (PlayerTurn::Black, Piece::Rook) => &mut self.black_rooks,
+            (PlayerTurn::Black, Piece::Queen) => &mut self.black_queens,
+            (PlayerTurn::Black, Piece::King) => &mut self.black_king,
+        };
+        *board &= !from_bits;
+        *board |= to_bits;
+    }
     pub fn pawn_valid_move(
         &self,
         file: &char,
         rank: &char,
         turn: &PlayerTurn,
-    ) -> Result<Square, BoardError> {
-        let rank_as_digit = *rank as u8 - b'0';
+    ) -> Result<Move, BoardError> {
+        let rank_as_digit = Self::translate_rank_to_numeric(rank) as u8;
         let current_square =
             Self::translate_rank_to_bits(rank) + Self::translate_file_to_bits(file);
-        if !(self.check_square_available(&current_square)) {
+        if !(self.check_square_available(&Moves::Move, &current_square)) {
             return Err(BoardError::SquareOccupied);
         }
+        let file_numeric = Self::translate_file_to_bits(file);
+        let to = Square {
+            bit: file_numeric as u8 + Self::translate_rank_to_bits(rank) as u8,
+        };
         match *turn {
             PlayerTurn::Black => {
-                if rank_as_digit >= 7 {
+                if rank_as_digit >= 6 {
                     return Err(BoardError::InputError);
                 }
                 if self.black_pawns & 1u64 << (current_square + 8) != 0 {
-                    Ok(Square {
-                        file: *file,
-                        rank: rank_as_digit + 1,
+                    let from = Square {
+                        bit: file_numeric as u8 + (rank_as_digit + 1) * 8,
+                    };
+
+                    Ok(Move {
+                        from,
+                        to,
+                        promotion: None,
                     })
-                } else if self.black_pawns & 1u64 << (current_square + 16) != 0 {
-                    Ok(Square {
-                        file: *file,
-                        rank: rank_as_digit + 2,
+                }
+                /*
+                 * This check is needed to ensure only pawns at their starting square can move two
+                 * squares
+                 * */
+                else if self.black_pawns & 1u64 << (current_square + 16) != 0
+                    && self.black_pawns & 1u64 << (48 + Self::translate_file_to_bits(file)) != 0
+                {
+                    let from = Square {
+                        bit: file_numeric as u8 + (rank_as_digit + 2) * 8,
+                    };
+                    Ok(Move {
+                        from,
+                        to,
+                        promotion: None,
                     })
                 } else {
                     Err(BoardError::NoPiece)
                 }
             }
             PlayerTurn::White => {
-                if rank_as_digit <= 1 || rank_as_digit > 8 {
+                if !(0..7).contains(&rank_as_digit) {
                     return Err(BoardError::InputError);
                 }
 
                 if self.white_pawns & (1u64 << (current_square - 8)) != 0 {
-                    Ok(Square {
-                        file: *file,
-                        rank: rank_as_digit - 1,
+                    let from = Square {
+                        bit: file_numeric as u8 + (rank_as_digit - 1) * 8,
+                    };
+                    Ok(Move {
+                        from,
+                        to,
+                        promotion: None,
                     })
-                } else if self.white_pawns & 1u64 << (current_square - 16) != 0 {
-                    Ok(Square {
-                        file: *file,
-                        rank: rank_as_digit - 2,
+                } else if self.white_pawns & 1u64 << (current_square - 16) != 0
+                    && self.white_pawns & 1u64 << (8 + Self::translate_file_to_bits(file)) != 0
+                {
+                    let from = Square {
+                        bit: file_numeric as u8 + (rank_as_digit - 2) * 8,
+                    };
+                    Ok(Move {
+                        from,
+                        to,
+                        promotion: None,
                     })
                 } else {
                     Err(BoardError::NoPiece)
@@ -154,7 +214,7 @@ impl Board {
     ) -> Option<[(i8, i8); 1]> {
         let current_rank = Self::translate_rank_to_numeric(rank);
         let current_file = Self::translate_file_to_bits(file) as i8;
-        eprintln!("{} {}", current_rank, current_file);
+
         for (dx, dy) in directions {
             for scalar in 1i8..8 {
                 let new_file = current_file + (dx * scalar);
@@ -212,7 +272,7 @@ impl Board {
                 }
                 let new_square = (new_rank * 8 + new_file) as u64;
 
-                if !(Self::check_square_available(self, &new_square)) {
+                if !(Self::check_square_available(self, &Moves::Move, &new_square)) {
                     return false;
                 }
             }
@@ -261,22 +321,44 @@ impl Board {
     }
     /*
      * This function is to check for any square, are there any pieces currently
-     * on it.
+     * on it for capturing or to move if empty.
      * Returns a boolean and allows you to use it from there for capturing or moving of pieces
      * */
-    pub fn check_square_available(&self, square: &u64) -> bool {
-        self.white_pawns & (1u64 << square) == 0
-            && self.white_king & (1u64 << square) == 0
-            && self.white_rooks & (1u64 << square) == 0
-            && self.white_queens & (1u64 << square) == 0
-            && self.white_knights & (1u64 << square) == 0
-            && self.white_bishops & (1u64 << square) == 0
-            && self.black_pawns & (1u64 << square) == 0
-            && self.black_king & (1u64 << square) == 0
-            && self.black_rooks & (1u64 << square) == 0
-            && self.black_queens & (1u64 << square) == 0
-            && self.black_knights & (1u64 << square) == 0
-            && self.black_bishops & (1u64 << square) == 0
+    pub fn check_square_available(&self, type_of_move: &Moves, square: &u64) -> bool {
+        match type_of_move {
+            Moves::Move => {
+                self.white_pawns & (1u64 << square) == 0
+                    && self.white_king & (1u64 << square) == 0
+                    && self.white_rooks & (1u64 << square) == 0
+                    && self.white_queens & (1u64 << square) == 0
+                    && self.white_knights & (1u64 << square) == 0
+                    && self.white_bishops & (1u64 << square) == 0
+                    && self.black_pawns & (1u64 << square) == 0
+                    && self.black_king & (1u64 << square) == 0
+                    && self.black_rooks & (1u64 << square) == 0
+                    && self.black_queens & (1u64 << square) == 0
+                    && self.black_knights & (1u64 << square) == 0
+                    && self.black_bishops & (1u64 << square) == 0
+            }
+            Moves::Capture(player) => match player {
+                PlayerTurn::White => {
+                    self.black_pawns & (1u64 << square) != 0
+                        || self.black_king & (1u64 << square) != 0
+                        || self.black_rooks & (1u64 << square) != 0
+                        || self.black_queens & (1u64 << square) != 0
+                        || self.black_knights & (1u64 << square) != 0
+                        || self.black_bishops & (1u64 << square) != 0
+                }
+                PlayerTurn::Black => {
+                    self.white_pawns & (1u64 << square) != 0
+                        || self.white_king & (1u64 << square) != 0
+                        || self.white_rooks & (1u64 << square) != 0
+                        || self.white_queens & (1u64 << square) != 0
+                        || self.white_knights & (1u64 << square) != 0
+                        || self.white_bishops & (1u64 << square) != 0
+                }
+            },
+        }
     }
 }
 
@@ -305,7 +387,6 @@ mod tests {
             &'3',
             &DIAGONAL_DIRECTION_VECTORS,
         );
-        println!("{:?}", check);
         assert!(check.is_some());
     }
     #[test]
@@ -317,7 +398,6 @@ mod tests {
             &'5',
             &HORIZONTAL_DIRECTION_VECTORS,
         );
-        println!("{:?}", check);
         assert!(check.is_some());
     }
 }

@@ -18,7 +18,7 @@ fn main() {
             .expect("Failed to read line");
         let input_move_trimmed = input_move.trim();
         if check_input_valid(input_move_trimmed)
-            && input_move::valid_input_moves(&chess_board, &player_turn, input_move_trimmed)
+            && input_move::valid_input_moves(&mut chess_board, &player_turn, input_move_trimmed)
         {
         } else {
             eprintln!("{} is not a valid move", input_move_trimmed);

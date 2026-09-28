@@ -1,5 +1,5 @@
 use crate::PlayerTurn;
-use crate::board::Board;
+use crate::board::{Board, BoardError, Piece};
 
 macro_rules! valid_chars {
     ($name:ident,$chars:literal) => {
@@ -11,15 +11,30 @@ macro_rules! valid_chars {
 valid_chars!(valid_files, "abcdefgh");
 valid_chars!(valid_rank, "12345678");
 valid_chars!(valid_piece, "NKQBR");
-pub fn valid_input_moves(board: &Board, turn: &PlayerTurn, input: &str) -> bool {
+pub fn valid_input_moves(board: &mut Board, turn: &PlayerTurn, input: &str) -> bool {
     let chars: Vec<char> = input.chars().collect();
     match chars.as_slice() {
         /*
          * For pawn moves
          * */
         [file, rank] if valid_files(file) && valid_rank(rank) => {
-            let square = board.pawn_valid_move(file, rank, turn);
-            println!("{:?}", square);
+            let pawn_move = board.pawn_valid_move(file, rank, turn);
+            match pawn_move {
+                Ok(m) => {
+                    board.move_piece(Piece::Pawn, turn, m.from, m.to);
+                }
+                Err(err) => match err {
+                    BoardError::NoPiece => {
+                        println!("No piece can be move to that square");
+                    }
+                    BoardError::SquareOccupied => {
+                        println!("Square is occupied");
+                    }
+                    BoardError::InputError => {
+                        println!("Please Input Correctly");
+                    }
+                },
+            }
             true
         }
 
