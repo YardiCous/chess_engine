@@ -126,14 +126,14 @@ impl Board {
         turn: &PlayerTurn,
     ) -> Result<Move, BoardError> {
         let rank_as_digit = Self::translate_rank_to_numeric(rank) as u8;
-        let current_square =
-            Self::translate_rank_to_bits(rank) + Self::translate_file_to_bits(file);
+        let rank_bits: u64 = Self::translate_rank_to_bits(rank);
+        let file_bits: u64 = Self::translate_file_to_bits(file);
+        let current_square = rank_bits + file_bits;
         if !(self.check_square_available(&Moves::Move, &current_square)) {
             return Err(BoardError::SquareOccupied);
         }
-        let file_numeric = Self::translate_file_to_bits(file);
         let to = Square {
-            bit: file_numeric as u8 + Self::translate_rank_to_bits(rank) as u8,
+            bit: file_bits as u8 + rank_bits as u8,
         };
         match *turn {
             PlayerTurn::Black => {
@@ -142,7 +142,7 @@ impl Board {
                 }
                 if self.black_pawns & 1u64 << (current_square + 8) != 0 {
                     let from = Square {
-                        bit: file_numeric as u8 + (rank_as_digit + 1) * 8,
+                        bit: file_bits as u8 + (rank_as_digit + 1) * 8,
                     };
 
                     Ok(Move {
@@ -159,7 +159,7 @@ impl Board {
                     && self.black_pawns & 1u64 << (48 + Self::translate_file_to_bits(file)) != 0
                 {
                     let from = Square {
-                        bit: file_numeric as u8 + (rank_as_digit + 2) * 8,
+                        bit: file_bits as u8 + (rank_as_digit + 2) * 8,
                     };
                     Ok(Move {
                         from,
@@ -177,7 +177,7 @@ impl Board {
 
                 if self.white_pawns & (1u64 << (current_square - 8)) != 0 {
                     let from = Square {
-                        bit: file_numeric as u8 + (rank_as_digit - 1) * 8,
+                        bit: file_bits as u8 + (rank_as_digit - 1) * 8,
                     };
                     Ok(Move {
                         from,
@@ -188,7 +188,7 @@ impl Board {
                     && self.white_pawns & 1u64 << (8 + Self::translate_file_to_bits(file)) != 0
                 {
                     let from = Square {
-                        bit: file_numeric as u8 + (rank_as_digit - 2) * 8,
+                        bit: file_bits as u8 + (rank_as_digit - 2) * 8,
                     };
                     Ok(Move {
                         from,
